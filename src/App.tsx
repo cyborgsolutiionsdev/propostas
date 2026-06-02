@@ -253,13 +253,18 @@ export default function App() {
     const signalValueInCents = Math.round((clientData.price / 2) * 100);
 
     try {
-      // Create charge in FloriBank API
-      const response = await fetch(`${FLORIBANK_API_URL}/charges`, {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      let url = '/.netlify/functions/payment-gateway';
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      
+      if (isLocalhost && !window.location.port.includes('8888')) {
+        url = `${FLORIBANK_API_URL}/charges`;
+        headers['Authorization'] = `Bearer ${FLORIBANK_SECRET_KEY}`;
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${FLORIBANK_SECRET_KEY}`
-        },
+        headers,
         body: JSON.stringify({
           value: signalValueInCents,
           payment_method: 'PIX',
@@ -310,11 +315,18 @@ export default function App() {
     setCheckingPayment(true);
 
     try {
-      const response = await fetch(`${FLORIBANK_API_URL}/charges/${chargeId}`, {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      let url = `/.netlify/functions/payment-gateway?id=${chargeId}`;
+      const headers: HeadersInit = {};
+
+      if (isLocalhost && !window.location.port.includes('8888')) {
+        url = `${FLORIBANK_API_URL}/charges/${chargeId}`;
+        headers['Authorization'] = `Bearer ${FLORIBANK_SECRET_KEY}`;
+      }
+
+      const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${FLORIBANK_SECRET_KEY}`
-        }
+        headers
       });
       const data = await response.json();
 
