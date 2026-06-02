@@ -1428,14 +1428,14 @@ export default function App() {
         </main>
       ) : (
         /* Regular Deck View for proposal slides */
-        <main className="flex-1 flex flex-col justify-between p-6 md:p-10 relative interactive-deck-view z-10">
+        <main className="flex-1 flex flex-col justify-between p-4 md:p-10 relative interactive-deck-view z-10">
           {/* Top Toolbar */}
           <div className="flex justify-between items-center mb-6 z-10 top-bar-controls">
             <div className="flex items-center gap-3">
               {!showConfig && isAdminMode && (
                 <button 
                   onClick={() => setShowConfig(true)}
-                  className="bg-slate-900/90 hover:bg-slate-850 border border-slate-800/80 p-2.5 rounded-xl text-slate-400 hover:text-white transition-all shadow-lg flex items-center gap-1.5 text-xs font-bold font-display cursor-pointer"
+                  className="bg-slate-900/90 hover:bg-slate-855 border border-slate-800/80 p-2.5 rounded-xl text-slate-400 hover:text-white transition-all shadow-lg flex items-center gap-1.5 text-xs font-bold font-display cursor-pointer"
                   title="Abrir Editor"
                 >
                   <Settings className="w-4 h-4 animate-spin-slow" />
@@ -1477,7 +1477,7 @@ export default function App() {
 
           {/* Dynamic Content Slide Display Box */}
           <div className="flex-1 flex flex-col justify-center max-w-4xl w-full mx-auto my-auto z-10">
-            <div className="cyber-glass rounded-3xl p-8 md:p-12 shadow-[0_30px_70px_rgba(0,0,0,0.5)] min-h-[520px] flex flex-col justify-between relative overflow-hidden group">
+            <div className="cyber-glass rounded-2xl md:rounded-3xl p-5 md:p-12 shadow-[0_30px_70px_rgba(0,0,0,0.5)] min-h-[460px] md:min-h-[540px] flex flex-col justify-between relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_rgba(0,240,255,0.8)]"></div>
               
               <div>
