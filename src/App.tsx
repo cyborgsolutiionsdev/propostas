@@ -378,49 +378,10 @@ export default function App() {
     }
   };
 
-  // Premium Logo with Metallic & Cyan Gradients
-  const CyborgLogo = ({ className = "h-20" }) => (
+  // Premium Logo with Official PNG
+  const CyborgLogo = ({ className = "" }) => (
     <div className={`flex flex-col items-center ${className}`}>
-      <div className="relative group">
-        <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl group-hover:bg-cyan-500/30 transition-all duration-500"></div>
-        <svg className="w-24 h-24 relative z-10 filter drop-shadow-[0_0_15px_rgba(0,240,255,0.4)]" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="metalGrad" x1="20" y1="20" x2="100" y2="170" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="25%" stopColor="#cbd5e1" />
-              <stop offset="70%" stopColor="#64748b" />
-              <stop offset="100%" stopColor="#1e293b" />
-            </linearGradient>
-            <linearGradient id="neonCyanGrad" x1="100" y1="20" x2="180" y2="180" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#00f0ff" />
-              <stop offset="50%" stopColor="#0088ff" />
-              <stop offset="100%" stopColor="#0033aa" />
-            </linearGradient>
-          </defs>
-          <path d="M100 20C75 20 55 35 45 55C40 65 40 75 42 85L35 100C32 106 35 112 40 115L45 125C47 130 52 135 58 138L62 150C63 154 68 158 72 158H100V20Z" fill="url(#metalGrad)" />
-          <path d="M48 60L75 50L85 65L65 80L48 60Z" fill="#475569" stroke="#0f172a" strokeWidth="2" />
-          <path d="M45 88L70 82L80 98L55 105L45 88Z" fill="#334155" stroke="#0f172a" strokeWidth="2" />
-          <path d="M55 110L78 105L85 120L62 125L55 110Z" fill="#475569" stroke="#0f172a" strokeWidth="2" />
-          <rect x="52" y="72" width="22" height="6" rx="3" fill="#ffffff" />
-          <rect x="56" y="74" width="8" height="2" rx="1" fill="#00f0ff" />
-          <circle cx="85" cy="90" r="12" fill="#0f172a" stroke="#1e293b" strokeWidth="2" />
-          <circle cx="85" cy="90" r="5" fill="#00f0ff" />
-          <path d="M72 158L78 175C79 178 83 180 86 180H100V158H72Z" fill="#334155" />
-          <circle cx="84" cy="170" r="3" fill="#00f0ff" />
-          <line x1="100" y1="15" x2="100" y2="185" stroke="#00f0ff" strokeWidth="2" strokeDasharray="3 3" />
-          <path d="M100 20C125 20 145 35 155 55C160 65 160 75 158 85C165 95 165 110 158 120C155 130 148 138 140 145C130 155 115 162 100 164V20Z" fill="none" stroke="url(#neonCyanGrad)" strokeWidth="2.5" />
-          <path d="M100 45H128V62H145" stroke="#00f0ff" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="145" cy="62" r="3.5" fill="#00f0ff" />
-          <path d="M100 75H135L145 90H160" stroke="#00f0ff" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="160" cy="90" r="3.5" fill="#00f0ff" />
-          <path d="M100 105H118L128 120H142L148 135H138" stroke="#00f0ff" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="138" cy="135" r="3.5" fill="#00f0ff" />
-          <path d="M100 135H115L125 150H138" stroke="#00f0ff" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="138" cy="150" r="3.5" fill="#00f0ff" />
-        </svg>
-      </div>
-      <span className="text-3xl font-black tracking-[0.3em] text-white mt-3 font-display">CYBORG</span>
-      <span className="text-[11px] tracking-[0.55em] text-cyan-400 font-extrabold uppercase mt-1">Solutions</span>
+      <img src="/logo.png" alt="Cyborg Solutions Logo" className="w-40 h-auto object-contain" />
     </div>
   );
 
