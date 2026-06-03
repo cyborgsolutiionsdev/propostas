@@ -102,6 +102,7 @@ function generatePixCode(key: string, amount: number, name: string, city = 'FLOR
 export default function App() {
   const [clientData, setClientData] = useState({
     id: "",
+    slug: "",
     clinicName: "Bett Odontologia",
     representative: "Dr. Roberto Bett",
     cnpj: "12.345.678/0001-90",
@@ -158,6 +159,7 @@ export default function App() {
         if (data && !error) {
           setClientData({
             id: data.id,
+            slug: data.slug || '',
             clinicName: data.empresa_nome,
             representative: data.cliente_nome,
             cnpj: data.cnpj || '',
@@ -247,10 +249,10 @@ export default function App() {
     const { data, error } = result;
 
     if (!error && data && data[0]) {
-      setClientData(prev => ({ ...prev, id: data[0].id }));
+      setClientData(prev => ({ ...prev, id: data[0].id, slug: data[0].slug || '' }));
       setSaveStatus('success');
       setTimeout(() => setSaveStatus(''), 3000);
-      return data[0].id;
+      return { id: data[0].id, slug: data[0].slug || '' };
     } else {
       console.error(error);
       setSaveStatus('error');
@@ -260,18 +262,27 @@ export default function App() {
   };
 
   // Generate public dynamic link to view proposal
-  const generateShareableLink = (id = clientData.id) => {
-    if (!id) return window.location.origin;
-    return `${window.location.origin}/?id=${id}`;
+  const generateShareableLink = (idOrSlug = clientData.slug || clientData.id) => {
+    if (!idOrSlug) return window.location.origin;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    if (isUuid) {
+      return `${window.location.origin}/?id=${idOrSlug}`;
+    }
+    return `${window.location.origin}/${idOrSlug}`;
   };
 
   const copyToClipboard = async () => {
     let activeId = clientData.id;
+    let activeSlug = clientData.slug;
     if (!activeId) {
-      activeId = await handleSaveProposal();
+      const saved = await handleSaveProposal();
+      if (saved) {
+        activeId = saved.id;
+        activeSlug = saved.slug;
+      }
     }
     if (activeId) {
-      const link = generateShareableLink(activeId);
+      const link = generateShareableLink(activeSlug || activeId);
       navigator.clipboard.writeText(link);
       setShowCopiedToast(true);
       setTimeout(() => setShowCopiedToast(false), 3000);
@@ -359,7 +370,9 @@ export default function App() {
         .delete()
         .eq('id', proposalId);
       
-      if (!error) {
+      if (error) {
+        alert("Erro ao deletar proposta: " + error.message + "\n\nVerifique se a política de exclusão (DELETE) está ativa no seu banco do Supabase.");
+      } else {
         fetchProposals();
       }
     }
@@ -1255,6 +1268,7 @@ export default function App() {
                           onClick={() => {
                             setClientData({
                               id: p.id,
+                              slug: p.slug || '',
                               clinicName: p.empresa_nome,
                               representative: p.cliente_nome,
                               cnpj: p.cnpj || '',
@@ -1276,7 +1290,7 @@ export default function App() {
                         </button>
                         <button 
                           onClick={() => {
-                            const link = generateShareableLink(p.id);
+                            const link = generateShareableLink(p.slug || p.id);
                             navigator.clipboard.writeText(link);
                             alert("Link da proposta copiado!");
                           }}
@@ -1314,6 +1328,7 @@ export default function App() {
               onClick={() => {
                 setClientData({
                   id: "",
+                  slug: "",
                   clinicName: "Nova Clínica",
                   representative: "",
                   cnpj: "",
@@ -1420,7 +1435,7 @@ export default function App() {
         /* Regular Deck View for proposal slides */
         <main className="flex-1 flex flex-col justify-between p-4 md:p-10 relative interactive-deck-view z-10">
           {/* Top Toolbar */}
-          <div className="flex justify-between items-center mb-6 z-10 top-bar-controls">
+          <div className="flex flex-wrap justify-between items-center gap-3 mb-6 z-10 top-bar-controls">
             <div className="flex items-center gap-3">
               {!showConfig && isAdminMode && (
                 <button 

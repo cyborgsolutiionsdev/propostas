@@ -33,3 +33,7 @@ CREATE POLICY "Permitir inserção pública" ON public.propostas
 
 CREATE POLICY "Permitir update público" ON public.propostas
     FOR UPDATE USING (true);
+
+CREATE POLICY "Permitir delete público" ON public.propostas
+    FOR DELETE USING (true);
+
