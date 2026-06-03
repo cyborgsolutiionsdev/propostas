@@ -30,7 +30,9 @@ import {
   Trash2,
   Mail,
   Phone,
-  Loader2
+  Loader2,
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -136,6 +138,12 @@ export default function App() {
   const [chargeId, setChargeId] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("PENDING"); // PENDING | PAID | EXPIRED
 
+  // Security and loading states
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState("");
+  const [hasLoadedProposal, setHasLoadedProposal] = useState(false);
+  const [isLoadingProposal, setIsLoadingProposal] = useState(true);
+
   // Initialize data based on URL
   useEffect(() => {
     const path = window.location.pathname.replace(/^\/|\/$/g, '').toLowerCase();
@@ -146,7 +154,14 @@ export default function App() {
     setIsAdminMode(isPathAdmin);
     setShowConfig(isPathAdmin);
 
+    // Restore authentication from session storage
+    const storedAuth = sessionStorage.getItem('isAdminAuthenticated');
+    if (storedAuth === 'true') {
+      setIsAdminAuthenticated(true);
+    }
+
     const loadProposalData = async () => {
+      setIsLoadingProposal(true);
       let query = null;
       if (id) {
         query = supabase.from('propostas').select('*').eq('id', id).single();
@@ -172,6 +187,7 @@ export default function App() {
             spotsLeft: data.vagas_restantes || 4,
             pixKey: data.chave_pix || 'financeiro@cyborgsolutions.com.br'
           });
+          setHasLoadedProposal(true);
           setIsAdminMode(false);
           setShowConfig(false);
           if (data.status === 'aprovada' || data.status === 'entregue') {
@@ -181,12 +197,32 @@ export default function App() {
               setPaymentStatus('PAID');
             }
           }
+        } else {
+          setHasLoadedProposal(false);
         }
+      } else {
+        setHasLoadedProposal(false);
       }
+      setIsLoadingProposal(false);
     };
 
-    loadProposalData();
+    if (isPathAdmin) {
+      setIsLoadingProposal(false);
+    } else {
+      loadProposalData();
+    }
   }, []);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPasswordInput === 'cyborg@admin') {
+      setIsAdminAuthenticated(true);
+      sessionStorage.setItem('isAdminAuthenticated', 'true');
+      setAdminPasswordInput('');
+    } else {
+      alert("Senha incorreta!");
+    }
+  };
 
   // Fetch proposals list for Kanban CRM Board
   const fetchProposals = async () => {
@@ -975,6 +1011,107 @@ export default function App() {
   const triggerPrint = () => {
     window.print();
   };
+
+  if (isLoadingProposal) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center relative font-sans">
+        <div className="absolute inset-0 bg-cyber-grid pointer-events-none opacity-40 z-0"></div>
+        <div className="z-10 flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
+          <span className="text-xs uppercase tracking-widest text-slate-500 font-black font-mono">Carregando Proposta...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAdminMode && !isAdminAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center relative font-sans p-4">
+        <div className="absolute inset-0 bg-cyber-grid pointer-events-none opacity-40 z-0"></div>
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-40 right-20 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div className="cyber-glass rounded-2xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl relative z-10">
+          <CyborgLogo className="mb-2" />
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-white font-display uppercase tracking-tight">Painel Cyborg Admin</h2>
+            <p className="text-xs text-slate-400 font-medium">Insira a senha de administrador para acessar os orçamentos e o funil CRM.</p>
+          </div>
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <input 
+              type="password" 
+              placeholder="Digite a senha"
+              value={adminPasswordInput}
+              onChange={(e) => setAdminPasswordInput(e.target.value)}
+              className="w-full bg-slate-950 text-white border border-slate-800 p-3.5 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 text-xs text-center transition-all font-semibold"
+              autoFocus
+            />
+            <button 
+              type="submit"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black p-3.5 rounded-xl text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(0,240,255,0.25)] cursor-pointer"
+            >
+              Entrar
+            </button>
+          </form>
+          <button 
+            onClick={() => {
+              setIsAdminMode(false);
+              window.history.pushState({}, '', '/');
+            }}
+            className="text-[10px] text-slate-500 hover:text-slate-400 font-bold uppercase tracking-wider block mx-auto cursor-pointer"
+          >
+            Voltar para o Início
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdminMode && !hasLoadedProposal) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center relative font-sans p-4">
+        <div className="absolute inset-0 bg-cyber-grid pointer-events-none opacity-40 z-0"></div>
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-40 right-20 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="cyber-glass rounded-2xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative z-10">
+          <CyborgLogo className="mb-2" />
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-white font-display uppercase tracking-tight flex items-center justify-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-red-500" /> Acesso Restrito
+            </h2>
+            <p className="text-slate-350 text-xs leading-relaxed font-semibold">
+              Este portal é de uso exclusivo para visualização de propostas comerciais personalizadas da Cyborg Solutions.
+            </p>
+            <p className="text-slate-500 text-[10px] leading-relaxed font-medium">
+              Nenhuma proposta ativa foi encontrada neste endereço. Se você é cliente e recebeu um link, certifique-se de que a URL está correta.
+            </p>
+          </div>
+          <div className="pt-2">
+            <a 
+              href="https://cyborgsolutiions.com.br"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(0,240,255,0.25)]"
+            >
+              Conhecer a Cyborg Solutions
+            </a>
+          </div>
+          <div className="pt-4 border-t border-slate-900">
+            <button 
+              onClick={() => {
+                setIsAdminMode(true);
+                window.history.pushState({}, '', '/admin');
+              }}
+              className="text-[9px] text-slate-600 hover:text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mx-auto cursor-pointer"
+            >
+              <Lock className="w-3 h-3" /> Área Administrativa
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row relative font-sans">
