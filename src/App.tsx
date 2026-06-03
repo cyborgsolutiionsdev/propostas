@@ -55,9 +55,49 @@ export interface Proposal {
 }
 
 
-// Configuration keys for FloriBank Gateway
-const FLORIBANK_API_URL = import.meta.env.VITE_FLORIBANK_API_URL || 'https://sandbox.floribank.com.br/api/v1';
-const FLORIBANK_SECRET_KEY = import.meta.env.VITE_FLORIBANK_SECRET_KEY || 'fp_sec_test_placeholder';
+
+// Helper function to generate standard Pix BR Code (Copia e Cola)
+function calculateCRC16(str: string): string {
+  let crc = 0xFFFF;
+  const polynomial = 0x1021;
+  for (let i = 0; i < str.length; i++) {
+    const b = str.charCodeAt(i);
+    for (let j = 0; j < 8; j++) {
+      const bit = ((b >> (7 - j) & 1) === 1);
+      const c15 = ((crc >> 15 & 1) === 1);
+      crc <<= 1;
+      if (c15 !== bit) {
+        crc ^= polynomial;
+      }
+    }
+  }
+  crc &= 0xFFFF;
+  return crc.toString(16).padStart(4, '0').toUpperCase();
+}
+
+function generatePixCode(key: string, amount: number, name: string, city = 'FLORIANOPOLIS', txid = '***'): string {
+  const cleanName = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
+  const cleanCity = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
+
+  const gui = "000201";
+  const guiPix = "0014br.gov.bcb.pix";
+  const keyFormatted = `01${key.length.toString().padStart(2, '0')}${key}`;
+  const merchantAccountInfo = `26${(guiPix.length + keyFormatted.length).toString().padStart(2, '0')}${guiPix}${keyFormatted}`;
+  const mcc = "52040000";
+  const currency = "5303986";
+  const amountStr = amount.toFixed(2);
+  const amountFormatted = `54${amountStr.length.toString().padStart(2, '0')}${amountStr}`;
+  const country = "5802BR";
+  const nameFormatted = `59${cleanName.length.toString().padStart(2, '0')}${cleanName}`;
+  const cityFormatted = `60${cleanCity.length.toString().padStart(2, '0')}${cleanCity}`;
+  const txidFormatted = `05${txid.length.toString().padStart(2, '0')}${txid}`;
+  const additionalData = `62${txidFormatted.length.toString().padStart(2, '0')}${txidFormatted}`;
+
+  const rawPayload = `${gui}${merchantAccountInfo}${mcc}${currency}${amountFormatted}${country}${nameFormatted}${cityFormatted}${additionalData}6304`;
+  const crc = calculateCRC16(rawPayload);
+  return `${rawPayload}${crc}`;
+}
+
 
 export default function App() {
   const [clientData, setClientData] = useState({
@@ -94,7 +134,6 @@ export default function App() {
   const [pixQrCodeUrl, setPixQrCodeUrl] = useState("");
   const [chargeId, setChargeId] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("PENDING"); // PENDING | PAID | EXPIRED
-  const [checkingPayment, setCheckingPayment] = useState(false);
 
   // Initialize data based on URL
   useEffect(() => {
@@ -245,108 +284,46 @@ export default function App() {
     setTimeout(() => setCopiedPix(false), 2000);
   };
 
-  // Client accepts and triggers FloriBank payment creation
+  // Client accepts and triggers standard Pix generation
   const handleClientAccept = async () => {
     if (signatureName.trim().length <= 3) return;
     setIsLoadingPayment(true);
 
-    const signalValueInCents = Math.round((clientData.price / 2) * 100);
+    const signalValue = clientData.price / 2;
 
     try {
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      let url = '/.netlify/functions/payment-gateway';
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      // Generate Pix Copia e Cola locally using standard EMV specification
+      const brCode = generatePixCode(clientData.pixKey, signalValue, 'CYBORG SOLUTIONS');
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(brCode)}`;
+
+      setPixBrCode(brCode);
+      setPixQrCodeUrl(qrCodeUrl);
+      setChargeId(`local_${Date.now()}`);
+
+      // Update database with signature, signature date and proposal status
+      if (clientData.id) {
+        await supabase
+          .from('propostas')
+          .update({
+            status: 'aprovada',
+            assinatura_nome: signatureName,
+            assinatura_data: new Date().toISOString()
+          })
+          .eq('id', clientData.id);
+      }
       
-      if (isLocalhost && !window.location.port.includes('8888')) {
-        url = `${FLORIBANK_API_URL}/charges`;
-        headers['Authorization'] = `Bearer ${FLORIBANK_SECRET_KEY}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          value: signalValueInCents,
-          payment_method: 'PIX',
-          correlation_id: clientData.id || `local_${Date.now()}`,
-          description: `Sinal 50% - Proposta Cyborg Solutions para ${clientData.clinicName}`,
-          customer: {
-            name: signatureName,
-            document: clientData.cnpj.replace(/\D/g, ''),
-            email: clientData.email
-          }
-        })
-      });
-
-      const resData = await response.json();
-
-      if (response.ok && resData) {
-        setPixBrCode(resData.br_code);
-        setPixQrCodeUrl(resData.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(resData.br_code)}`);
-        setChargeId(resData.id);
-        
-        // Update database with signature, signature date and proposal status
-        if (clientData.id) {
-          await supabase
-            .from('propostas')
-            .update({
-              status: 'aprovada',
-              assinatura_nome: signatureName,
-              assinatura_data: new Date().toISOString()
-            })
-            .eq('id', clientData.id);
-        }
-        
-        setSignatureApproved(true);
-      } else {
-        alert(`Erro do Gateway FloriBank: ${resData?.error?.message || 'Falha ao processar cobrança'}`);
-      }
+      setSignatureApproved(true);
     } catch (e) {
       console.error(e);
-      alert("Erro na conexão com o servidor de pagamentos FloriBank.");
+      alert("Erro ao processar assinatura e gerar Pix.");
     } finally {
       setIsLoadingPayment(false);
     }
   };
 
-  // Query/Poll FloriBank charge status dynamically
+  // Deprecated payment polling as we now use direct static Pix + WhatsApp confirmation
   const checkPaymentStatus = async () => {
-    if (!chargeId) return;
-    setCheckingPayment(true);
-
-    try {
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      let url = `/.netlify/functions/payment-gateway?id=${chargeId}`;
-      const headers: HeadersInit = {};
-
-      if (isLocalhost && !window.location.port.includes('8888')) {
-        url = `${FLORIBANK_API_URL}/charges/${chargeId}`;
-        headers['Authorization'] = `Bearer ${FLORIBANK_SECRET_KEY}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers
-      });
-      const data = await response.json();
-
-      if (response.ok && data) {
-        setPaymentStatus(data.status);
-        if (data.status === 'PAID') {
-          // Update status to delivered/paid in Supabase
-          if (clientData.id) {
-            await supabase
-              .from('propostas')
-              .update({ status: 'entregue' })
-              .eq('id', clientData.id);
-          }
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCheckingPayment(false);
-    }
+    // No-op
   };
 
   // Auto-poll status when charge is created
@@ -885,7 +862,7 @@ export default function App() {
             {isLoadingPayment ? (
               <div className="py-12 flex flex-col items-center justify-center gap-4">
                 <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
-                <p className="text-sm font-bold text-slate-300 font-display">Gerando PIX Oficial FloriBank...</p>
+                <p className="text-sm font-bold text-slate-300 font-display">Gerando PIX Oficial Cyborg Solutions...</p>
                 <p className="text-xs text-slate-500">Aguardando confirmação do gateway financeiro</p>
               </div>
             ) : !signatureApproved ? (
@@ -934,11 +911,11 @@ export default function App() {
 
                 {paymentStatus === 'PAID' ? (
                   <div className="bg-emerald-950/20 border border-emerald-500/35 p-6 rounded-xl text-center space-y-3">
-                    <p className="text-xs text-emerald-400 font-extrabold uppercase tracking-widest">Pagamento Confirmado no FloriBank!</p>
+                    <p className="text-xs text-emerald-400 font-extrabold uppercase tracking-widest">Pagamento Confirmado!</p>
                     <p className="text-slate-300 text-xs leading-relaxed">Nossos engenheiros já foram notificados da aprovação financeira de <strong>{formatCurrency(clientData.price / 2)}</strong>. O kick-off do projeto foi disparado com sucesso!</p>
                     
                     <a 
-                      href={`https://api.whatsapp.com/send?phone=5548991234567&text=Olá Cyborg! Realizei a assinatura e o pagamento do sinal no valor de ${formatCurrency(clientData.price / 2)} da ${encodeURIComponent(clientData.clinicName)}.`}
+                      href={`https://api.whatsapp.com/send?phone=5548991234567&text=${encodeURIComponent(`Olá Cyborg! Realizei a assinatura e o pagamento do sinal no valor de ${formatCurrency(clientData.price / 2)} da ${clientData.clinicName}.`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center gap-2 w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black p-3.5 rounded-xl text-xs uppercase tracking-widest shadow-md transition-colors"
@@ -954,7 +931,7 @@ export default function App() {
                         {pixQrCodeUrl ? (
                           <img 
                             src={pixQrCodeUrl} 
-                            alt="FloriBank PIX QR Code" 
+                            alt="Cyborg Solutions PIX QR Code" 
                             className="w-40 h-40"
                           />
                         ) : (
@@ -970,7 +947,7 @@ export default function App() {
                         </div>
 
                         <p className="text-[9px] text-slate-400 leading-relaxed font-semibold">
-                          Aguardando liquidação do Pix no FloriBank... A página atualizará automaticamente após o pagamento.
+                          Realize o pagamento do Pix ao lado e clique no botão abaixo para enviar o comprovante pelo WhatsApp e iniciar o projeto.
                         </p>
 
                         <button 
@@ -981,14 +958,15 @@ export default function App() {
                           {copiedPix ? 'Chave Copiada!' : 'Copiar PIX Copia e Cola'}
                         </button>
 
-                        <button 
-                          onClick={checkPaymentStatus}
-                          disabled={checkingPayment}
-                          className="w-full bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-400 hover:text-white font-bold p-2.5 rounded-lg text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                        <a 
+                          href={`https://api.whatsapp.com/send?phone=5548991234567&text=${encodeURIComponent(`Olá Cyborg! Realizei a assinatura e o pagamento do sinal no valor de ${formatCurrency(clientData.price / 2)} para o projeto da ${clientData.clinicName}. Segue o comprovante em anexo!`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black p-2.5 rounded-lg text-[9px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-colors text-center"
                         >
-                          {checkingPayment ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3 text-cyan-400" />}
-                          Verificar Pagamento Manualmente
-                        </button>
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          Já fiz o pagamento - Enviar WhatsApp
+                        </a>
                       </div>
                     </div>
 
