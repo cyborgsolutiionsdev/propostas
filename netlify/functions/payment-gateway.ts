@@ -13,8 +13,16 @@ export const handler: Handler = async (event) => {
     return { statusCode: 200, headers, body: '' };
   }
 
-  const apiUrl = process.env.VITE_FLORIBANK_API_URL || 'https://api.floribank.com.br/api/v1';
+  const apiUrl = process.env.VITE_FLORIBANK_API_URL;
   const secretKey = process.env.VITE_FLORIBANK_SECRET_KEY || '';
+
+  if (!apiUrl) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'A variável VITE_FLORIBANK_API_URL não está configurada nas variáveis de ambiente do Netlify.' }) 
+    };
+  }
 
   if (!secretKey) {
     return { 
